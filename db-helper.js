@@ -1,5 +1,5 @@
 const DB_NAME = 'pwa-outbox-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'transacciones_pendientes';
 
 function abrirDB(){
@@ -49,6 +49,35 @@ function obtenerTodosLosRegistros(){
 
       req.onsuccess = (event) => resolve(event.target.result);
       req.onerror = (event) => reject(event.target.error);
+    });
+  });
+}
+
+function actualizarEstadoRegistro(id, nuevoEstado){
+  return abrirDB().then((db) => {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([STORE_NAME], 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+
+      // 1. Obtener el registro actual por su llave primaria
+      const reqGet = store.get(id);
+
+      reqGet.onsuccess = (event) => {
+        const registro = event.target.result;
+        if (!registro) {
+          reject(new Error(`No se encontró el registro con ID: ${id}`));
+          return;
+        }
+
+        // 2. Modificar la propiedad y sobrescribir con .put()
+        registro.estado = nuevoEstado;
+        registro.fechaSincronizacion = Date.now();
+        store.put(registro);
+      };
+
+      // 3. Resolver la promesa cuando la transacción completa el guardado en disco
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = (event) => reject(event.target.error);
     });
   });
 }
